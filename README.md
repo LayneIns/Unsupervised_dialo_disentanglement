@@ -26,7 +26,7 @@ python bert_train.py --data_name movie --aug_type same_speaker --model_config be
 You can evaluate the performance of the finetuned model by:
 ```
 cd ./pretrain/message-pair-classifier/
-python bert_eval_disentangle.py --data_type dev --data_name movie --aug_type same_speaker --model_path output/movie/same_speaker/2021-Feb-27-04_48_12/cache/ckpt-800/ --per_gpu_eval_batch_size 128 --fp16
+python bert_eval_disentangle.py --data_type dev --data_name movie --aug_type same_speaker --model_path output/movie/same_speaker/ckpt-800/ --per_gpu_eval_batch_size 128 --fp16
 ```
 
 ### Session Classifier
@@ -54,6 +54,35 @@ python main.py --bidirectional --per_gpu_batch_size 1024 --save_steps 2500 --log
 You can evaluate the performance as:
 ```
 cd ./pretrain/session-classifier/
-python disentangle_inference.py --output_dir output/movie/single/2021-Apr-06-02_02_52/ --checkpoint -1 --bidirectional --per_gpu_batch_size 512
+python disentangle_inference.py --output_dir output/movie/ --checkpoint -1 --bidirectional --per_gpu_batch_size 512
+```
+## Co-training
+
+Before co-training, you have to obtain the local relation between every message pairs in a conversation in the training set. You can obtain it by:
+```
+cd ./co-training/bert-reward/
+python bert-eval.py --model_path checkpoint/1/ckpt-16000/ --fp16 --read_cached_input --per_gpu_eval_batch_size 4096 --round 1
+```
+This step will yield the reward files ``reward.pt`` which will be used in the RL training stage.
+
+During the RL training stage, you can run:
+```
+cd ./co-training/rl/
+python main.py --init_checkpoint initialize/1/ckpt-7500.pkl --word_dict initialize/word_dict.pt --bidirectional --per_gpu_batch_size 128 --lr 5e-6 --epochs 3 --coherency_reward_weight 0.6 --round 1
+```
+The ``--init_checkpoint`` argument specifies the saved checkpoint of the Session Classifier during the pre-training step. The ``--word_dict`` argument specifies the word dictionary used by the Session Classifier during the pre-training step.
+
+You can iteratively run the pre-training step and the co-training step, where you can update the pseudo training dataset of the Message-pair Classifier with the  disentanglement results predicted during co-training step. And then the updated Message-pair Classifier will predict new local relations of message pairs.
+
+You can test the performance by:
+```
+cd ./co-training/rl/
+python disentangle_inference.py --output_dir rl-train/output/movie/1/ --checkpoint 100 --bidirectional --per_gpu_batch_size 512
 ```
 
+## Citation
+
+Coming soon!
+
+## Q&A
+If you have any questions about the paper and the code, please feel free to leave an issue or send me an email.
